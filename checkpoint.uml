@@ -1,0 +1,77 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor #f8f9fa
+  BorderColor #495057
+  ArrowColor #343a40
+}
+skinparam activityFontSize 13
+
+title Security Checkpoint e-Gate + Smart Queue Assignment
+
+start
+
+partition "Passenger" {
+  :Approach security checkpoint e-gate;
+  :Scan boarding pass (QR/Aztec/2D);
+}
+
+partition "e-Gate Workstation\n(UI + Devices)" {
+  :Read barcode payload;
+  :Show "Processing...";
+
+  if (Backend Online?) then (yes)
+    partition "API Interaction" {
+        :POST /sessions/{id}/scan;
+
+        if (Scan Accepted?) then (yes)
+            :POST /sessions/{id}/decision;
+
+            partition "Airport Security Access API" {
+                :Validate Session;
+                group "Context Enrichment (Synchronous)"
+                    :Fetch Flight Status (AODB);
+                    :Fetch Lane Status (Queue Monitor);
+                end group
+                :Execute Assignment Rules;
+                :Return AccessDecision\n(ALLOW/DENY);
+            }
+        else (no)
+            :Display "Invalid Barcode";
+            stop
+        endif
+    }
+  else (no - Offline Mode)
+    partition "Local Logic (Resilience)" {
+        :Validate BCBP Signature (Local Keys);
+        :Apply Static Assignment Rules\n(e.g. Round Robin);
+    }
+  endif
+
+  if (Decision == ALLOW?) then (yes)
+    :Display Assigned Lane;
+
+    if (Online?) then (yes)
+        :POST /gate/open;
+    endif
+
+    partition "Gate Hardware (HAL)" {
+        :Unlock Turnstile;
+    }
+
+    :Show "Proceed to Lane X";
+
+    partition "Passenger" {
+        :Walk through gate;
+    }
+  else (no / REFER)
+    #LightCoral:Display "Access Denied" or "Contact Staff";
+    partition "Passenger" {
+        :Go to assistance desk;
+    }
+  endif
+}
+
+stop
+@enduml

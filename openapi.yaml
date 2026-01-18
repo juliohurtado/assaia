@@ -32,15 +32,15 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CreateSessionRequest' }
+            schema: { $ref: "#/components/schemas/CreateSessionRequest" }
       responses:
-        '201':
+        "201":
           description: Session created
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Session' }
-        '401': { description: Unauthorized }
-        '500': { description: Internal error }
+              schema: { $ref: "#/components/schemas/Session" }
+        "401": { description: Unauthorized }
+        "500": { description: Internal error }
 
   /security-access/sessions/{sessionId}/scan:
     post:
@@ -51,21 +51,21 @@ paths:
         The backend parses and validates the payload format, and links it to the session.
       operationId: submitBoardingPassScan
       parameters:
-        - $ref: '#/components/parameters/sessionId'
+        - $ref: "#/components/parameters/sessionId"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/BoardingPassScanRequest' }
+            schema: { $ref: "#/components/schemas/BoardingPassScanRequest" }
       responses:
-        '200':
+        "200":
           description: Scan accepted
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ScanResult' }
-        '400': { description: Unreadable/invalid scan payload }
-        '404': { description: Session not found/expired }
-        '500': { description: Internal error }
+              schema: { $ref: "#/components/schemas/ScanResult" }
+        "400": { description: Unreadable/invalid scan payload }
+        "404": { description: Session not found/expired }
+        "500": { description: Internal error }
 
   /security-access/sessions/{sessionId}/decision:
     post:
@@ -78,23 +78,23 @@ paths:
         - passenger guidance message keys
       operationId: decideAccessAndLane
       parameters:
-        - $ref: '#/components/parameters/sessionId'
+        - $ref: "#/components/parameters/sessionId"
       requestBody:
         required: false
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/DecisionContextOverride' }
+            schema: { $ref: "#/components/schemas/DecisionContextOverride" }
       responses:
-        '200':
+        "200":
           description: Decision computed
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/AccessDecision' }
-        '409':
+              schema: { $ref: "#/components/schemas/AccessDecision" }
+        "409":
           description: Cannot decide due to missing scan or lane state unavailable
-        '404':
+        "404":
           description: Session not found/expired
-        '500':
+        "500":
           description: Internal error
 
   /security-access/sessions/{sessionId}/gate/open:
@@ -106,20 +106,20 @@ paths:
         This endpoint should be called only when AccessDecision.result = ALLOW.
       operationId: openGate
       parameters:
-        - $ref: '#/components/parameters/sessionId'
+        - $ref: "#/components/parameters/sessionId"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/GateOpenRequest' }
+            schema: { $ref: "#/components/schemas/GateOpenRequest" }
       responses:
-        '204':
+        "204":
           description: Gate open signal accepted
-        '409':
+        "409":
           description: Gate cannot be opened (no ALLOW decision, device busy, safety interlock)
-        '404':
+        "404":
           description: Session not found/expired
-        '500':
+        "500":
           description: Internal error
 
   /security-access/events:
@@ -131,14 +131,28 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/Event' }
+            schema: { $ref: "#/components/schemas/Event" }
       responses:
-        '202':
+        "202":
           description: Event accepted
-        '400':
+        "400":
           description: Invalid event payload
-        '401':
+        "401":
           description: Unauthorized
+
+  /security-access/heartbeat:
+    post:
+      tags: [Events]
+      summary: Send workstation heartbeat and health status
+      operationId: sendHeartbeat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Heartbeat" }
+      responses:
+        "204":
+          description: Heartbeat accepted
 
 components:
   securitySchemes:
@@ -241,11 +255,11 @@ components:
           description: Machine-readable reason
           example: "OK"
         laneAssignment:
-          $ref: '#/components/schemas/LaneAssignment'
+          $ref: "#/components/schemas/LaneAssignment"
         guidance:
-          $ref: '#/components/schemas/PassengerGuidance'
+          $ref: "#/components/schemas/PassengerGuidance"
         audit:
-          $ref: '#/components/schemas/AuditInfo'
+          $ref: "#/components/schemas/AuditInfo"
 
     LaneAssignment:
       type: object
@@ -298,7 +312,15 @@ components:
       properties:
         eventType:
           type: string
-          enum: [SCAN_OK, SCAN_FAILED, DECISION_MADE, GATE_OPENED, GATE_DENIED, STAFF_REFERRAL]
+          enum:
+            [
+              SCAN_OK,
+              SCAN_FAILED,
+              DECISION_MADE,
+              GATE_OPENED,
+              GATE_DENIED,
+              STAFF_REFERRAL,
+            ]
         timestamp:
           type: string
           format: date-time
@@ -319,3 +341,20 @@ components:
         traceId:
           type: string
           example: "trc_6f2b9c9c2a9f4b0e"
+
+    Heartbeat:
+      type: object
+      required: [checkpointId, workstationId, status, timestamp]
+      properties:
+        checkpointId: { type: string }
+        workstationId: { type: string }
+        status:
+          type: string
+          enum: [ONLINE, DEGRADED, OFFLINE]
+        componentHealth:
+          type: object
+          description: Status of connected peripherals (scanner, gate, etc.)
+          additionalProperties:
+            type: string
+            enum: [OK, ERROR, UNKNOWN]
+        timestamp: { type: string, format: date-time }

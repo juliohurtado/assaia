@@ -1,12 +1,13 @@
-# Jira Ticket: APT-SEC-201  
+# Jira Ticket: APT-SEC-201
+
 ## Develop Security Checkpoint e-Gate with Intelligent Queue Assignment
 
-**Epic:** Airport Passenger Flow Optimization  
-**Type:** Story  
-**Priority:** High  
-**Reporter:** Systems Analyst (Airport IT Department)  
-**Assignee:** Security Systems Development Team  
-**Sprint:** Q1 2026  
+**Epic:** Airport Passenger Flow Optimization
+**Type:** Story
+**Priority:** High
+**Reporter:** Systems Analyst (Airport IT Department)
+**Assignee:** Security Systems Development Team
+**Sprint:** Q1 2026
 
 ---
 
@@ -33,6 +34,7 @@ This system operates under airport responsibility and does not perform airline c
 ## Scope
 
 ### In Scope
+
 - Boarding pass validation at security access point.
 - Real-time assessment of passenger urgency and needs.
 - Automatic assignment of a security lane (queue).
@@ -41,6 +43,7 @@ This system operates under airport responsibility and does not perform airline c
 - Event logging and operational metrics.
 
 ### Out of Scope
+
 - Physical security screening (X-ray, body scanners).
 - Airline check-in, seat assignment, or boarding authorization.
 - Manual security procedures performed by officers.
@@ -51,6 +54,7 @@ This system operates under airport responsibility and does not perform airline c
 ## Functional Requirements
 
 ### 1. Passenger Access Validation
+
 - The system shall scan and validate the passenger boarding pass (2D barcode / QR / Aztec).
 - Validation rules include:
   - Flight date and airport match.
@@ -61,7 +65,9 @@ This system operates under airport responsibility and does not perform airline c
 ---
 
 ### 2. Passenger Context Evaluation
+
 Upon successful validation, the system shall determine passenger context using available data:
+
 - Time remaining until boarding or departure.
 - Passenger category (e.g. standard, PRM, senior, minor), if available.
 - Eligibility for priority or assisted lanes.
@@ -70,7 +76,9 @@ Upon successful validation, the system shall determine passenger context using a
 ---
 
 ### 3. Queue (Lane) State Assessment
+
 The system shall retrieve real-time information about available security lanes, including:
+
 - Lane type (standard, fast-track, PRM/assisted, family).
 - Current queue length or estimated waiting time.
 - Lane operational status (open / closed).
@@ -79,7 +87,9 @@ The system shall retrieve real-time information about available security lanes, 
 ---
 
 ### 4. Intelligent Queue Assignment
+
 The system shall automatically assign the passenger to the most appropriate lane based on:
+
 - Passenger urgency (e.g. proximity to boarding time).
 - Mandatory rules (e.g. PRM passengers to assisted lanes).
 - Operational balancing (avoid overloading a single lane).
@@ -89,6 +99,7 @@ The passenger shall not manually choose the lane in blocking scenarios.
 ---
 
 ### 5. Passenger Guidance
+
 - The system shall display clear instructions indicating the assigned lane.
 - Instructions shall include visual cues (lane number, color, icon) and text.
 - Guidance shall be shown in the passenger’s preferred UI language when available.
@@ -96,12 +107,14 @@ The passenger shall not manually choose the lane in blocking scenarios.
 ---
 
 ### 6. Access Control
+
 - Upon successful assignment, the system shall open the security e-gate or turnstile.
 - If no suitable lane is available, the passenger shall be redirected to security staff.
 
 ---
 
 ### 7. Monitoring and Logging
+
 - The system shall log events including:
   - Boarding pass validation result.
   - Assigned lane.
@@ -109,6 +122,11 @@ The passenger shall not manually choose the lane in blocking scenarios.
 - Events shall be forwarded to central airport monitoring systems.
 
 ---
+
+### 8. Offline & Resilience
+
+- **Offline Validation Mode:** In case of backend connectivity loss, the system shall validate the 2D Barcode (BCBP) signature locally using cached keys.
+- **Fail-safe Operation:** If intelligent assignment is offline, the system shall fallback to a local Round-Robin or static lane assignment algorithm.
 
 ## Inputs
 
@@ -164,6 +182,9 @@ The passenger shall not manually choose the lane in blocking scenarios.
 - Secure communication with backend systems.
 - Configurable business rules (e.g. time thresholds, lane priorities).
 - Deployable on standard airport workstation hardware (Windows/Linux).
+- **Data Privacy:** Logs and events MUST NOT contain plain-text PII (Personally Identifiable Information). Passenger names must be masked or hashed.
+- **Hardware Abstraction:** The system shall implement a Hardware Abstraction Layer (HAL) to support different gate/scanner vendors without core code changes.
+- **Configuration:** Critical parameters (lane status, priority rules) must be hot-reloadable without software restarts.
 
 ---
 

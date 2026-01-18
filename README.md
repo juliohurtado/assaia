@@ -2,89 +2,84 @@
 
 This repository contains a conceptual and technical design exercise focused on **airport passenger processing**, with special emphasis on **security checkpoint access automation and intelligent queue assignment**.
 
-The goal is to demonstrate **process design**, **system analysis**, and **requirement definition** skills in an airport IT context, based on observed passenger journeys and reasonable assumptions in the absence of complete input data.
+## 🚀 Executive Summary
+
+This design demonstrates a **Robust, Privacy-First, and Resilient** approach to airport automation. It goes beyond happy-path scenarios to address critical operational realities such as network failures, hardware variability, and data privacy regulations (GDPR). The solution is designed to operate continuously even during backend outages, ensuring passenger flow is never disrupted.
 
 ---
 
 ## 📁 Repository Contents
 
 ### 1. Passenger Journey – Process Design
+
 📄 **[`airport_flow.md`](./airport_flow.md)**
 
-Describes the **end-to-end passenger journey** from entering the departure terminal to boarding the aircraft, from the passenger’s point of view.
+Describes the **end-to-end passenger journey** from entering the departure terminal to boarding the aircraft.
 
-This document covers:
-- Main airport formalities
-- Participants involved at each step
-- Inputs and outputs
-- Alternative scenarios and edge cases
-- Possible system integrations
+- **Scope**: Terminal Entry → Boarding.
+- **Focus**: Inputs, outputs, participants, and system integrations at each step.
 
-This section corresponds to **Exercise 1** of the assignment.
+### 2. Security Checkpoint e-Gate – Requirements
 
----
-
-### 2. Security Checkpoint e-Gate – Automated Workstation Design
 📄 **[`checkpoint.md`](./checkpoint.md)**
 
-Defines an **automated security checkpoint e-gate workstation** operated by the airport, including:
-- Boarding pass validation at security access
-- Passenger context evaluation (urgency, special needs)
-- Intelligent assignment to security lanes (queues)
-- Passenger guidance and access control
-- Error handling and redirection to staff
+Defines the requirements for an **automated security checkpoint e-gate workstation**.
 
-This section corresponds to **Exercise 2** of the assignment and focuses on an airport-owned process rather than airline check-in.
-
----
+- **Core Logic**: Boarding pass validation and intelligent queue assignment.
+- **Enterprise Features**:
+  - **Offline Validation Mode**: Validates IATA BCBP digital signatures locally when the backend is down.
+  - **Hardware Abstraction Layer (HAL)**: Supports multiple hardware vendors (gates, scanners) via a unified interface.
+  - **Data Privacy**: Enforces PII masking in all logs and events.
+  - **Hot-Reloadable Config**: Allows rule changes without downtime.
 
 ### 3. Backend API Specification
-📄 **OpenAPI Specification (Swagger UI)**  
+
+📄 **OpenAPI Specification (Swagger UI)**
 🔗 **[View rendered API documentation](https://editor.swagger.io/?url=https://raw.githubusercontent.com/juliohurtado/assaia/refs/heads/main/openapi.yaml)**
 
-OpenAPI 3.0 specification for the **Airport Security Access & Queue Assignment API** used by the security checkpoint workstation.
+OpenAPI 3.0 specification for the **Airport Security Access & Queue Assignment API**.
 
-The API:
-- Manages security access sessions
-- Validates boarding passes
-- Computes lane assignment decisions
-- Controls gate/turnstile access
-- Emits operational and audit events
+- **Key Capabilities**: Includes sessions, scan validation, decision logic, gate control, and a `/heartbeat` endpoint for hardware health monitoring.
 
-External integrations (airline systems, queue monitoring, airport operations data) are abstracted behind this API.
+### 4. UML Diagram – Robust Activity Flow
+
+![Security Checkpoint e-Gate UML Diagram](./uml.png)
+
+Illustrates the end-to-end flow with a focus on **Request-Response cycles** and **Resilience**:
+
+- Visualizes the extensive **Offline Fallback** path.
+- Clarifies synchronous context fetching (Flight Status, Queue Load) vs. asynchronous events.
+- Handles scan errors and access denial flows.
 
 ---
 
-### 4. UML Diagram – Security Checkpoint e-Gate Flow
+## 🏗️ Key Architectural Highlights
 
-The following diagram illustrates the **end-to-end activity flow** for the automated security checkpoint e-gate, including passenger interaction, workstation behavior, backend API calls, decision logic, and gate control.
+This solution implements several "Day 2" operational patterns:
 
-![Security Checkpoint e-Gate UML Diagram](./uml.png)
+1.  **Resilience & Offline First**:
+    The system is designed to fail open or degrade gracefully. Critical validation steps (cryptographic signature checks) can occur locally, ensuring distinct queues (e.g., Round Robin) can still operate without the central brain.
+
+2.  **Privacy by Design**:
+    Strict requirements preventing PII leaks. Passenger names are never logged in plain text, decoupling operational metrics from personal identity.
+
+3.  **Hardware Independence**:
+    A **Hardware Abstraction Layer (HAL)** requirement ensures the business logic is decoupled from specific device drivers (e.g., changing a Gunnebo gate for a Dormakaba one doesn't require code changes).
+
+4.  **Observability**:
+    Dedicated `Heartbeat` events allow the central monitoring system to detect not just "app online" but also "scanner jammed" or "gate stuck" states.
 
 ---
 
 ## 🧭 How to Navigate This Repository
 
-1. Start with **`airport_flow.md`** to understand the overall passenger journey.
-2. Continue with **`checkpoint.md`** to see how one specific airport process is automated.
-3. Open the **Swagger UI link** to explore the backend API contract interactively.
-4. Review the **embedded UML diagram** to visualize the automated flow.
-
----
-
-## 🧩 Design Principles Highlighted
-
-- Clear separation between **airport-controlled** and **airline-controlled** processes.
-- Explicit handling of **blocking vs non-blocking scenarios**.
-- State-driven and auditable system design.
-- Support for real-time operational decision-making.
-- Consideration of accessibility and passenger experience.
+1.  Start with **`airport_flow.md`** to understand the high-level passenger context.
+2.  Review **`checkpoint.md`** for detailed functional and non-functional requirements.
+3.  Check the **Swagger UI** to see the technical contract.
+4.  Examine the **UML Diagram** (`uml.png`) to visualize the decision logic and fallback paths.
 
 ---
 
 ## 📌 Notes
 
-This repository is a **design and analysis exercise**, not an implementation.  
-All processes, rules, and integrations are based on common airport operations and informed assumptions.
-
----
+This repository is a **design and analysis exercise**. All processes, rules, and integrations are based on common airport operations and best-practice engineering assumptions.
