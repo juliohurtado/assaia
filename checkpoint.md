@@ -164,14 +164,64 @@ The passenger shall not manually choose the lane in blocking scenarios.
 
 ---
 
-## Acceptance Criteria
+## Detailed Acceptance Scenarios
 
-- **AC1:** Passenger with valid boarding pass is granted access and assigned a lane.
-- **AC2:** Passenger with imminent boarding time is prioritized to a faster or less congested lane.
-- **AC3:** PRM passengers are automatically assigned to assisted lanes.
-- **AC4:** Invalid boarding pass results in no gate opening and clear staff escalation.
-- **AC5:** Lane assignment decisions are logged and visible in monitoring systems.
-- **AC6:** System operates within acceptable response time (<1 second per passenger).
+### Scenario 1: Standard Access (Happy Path)
+
+**Given** a passenger with a valid boarding pass for a flight departing in 2 hours
+**And** all security lanes are operating at normal capacity
+**When** the passenger scans the boarding pass
+**Then** the gate opens within 1 second [Ref: AC6]
+**And** the passenger is assigned to a "Standard" lane
+**And** the instructions are shown in the language inferred from the flight destination (or default).
+
+### Scenario 2: Priority Access via Urgency
+
+**Given** a passenger with a flight departing in < 45 minutes (Imminent)
+**When** the passenger scans the boarding pass
+**Then** the gate opens
+**And** the system assigns the "Fast Track" lane (regardless of ticket class)
+**And** a "Prioritized" event is logged.
+
+### Scenario 3: PRM / Assisted Access
+
+**Given** a passenger identified as Person with Reduced Mobility (PRM) (via BCBP code or backend context)
+**When** the passenger scans the boarding pass
+**Then** the system assigns a "PRM/Assisted" lane (wider gate)
+**And** the UI displays the universal accessibility symbol.
+
+### Scenario 4: Access Denied / Invalid Pass
+
+**Given** a passenger with an invalid, expired, or wrong-airport boarding pass
+**When** the passenger scans the document
+**Then** the gate REMAINS CLOSED
+**And** the UI displays "Access Denied - Please contact staff" in Red
+**And** a "Security Alert" event is sent to the monitoring system.
+
+### Scenario 5: Offline Resilience (Connectivity Loss)
+
+**Given** the backend API is unreachable (Heartbeat timeout)
+**When** a passenger scans a valid IATA BCBP
+**Then** the system validates the digital signature locally
+**And** the gate opens (Fail-Open behavior for valid signatures)
+**And** the passenger is assigned a lane via "Round Robin" logic
+**And** an "Offline Validation" event is queued for later sync.
+
+### Scenario 6: Privacy & Logging Compliance
+
+**Given** a successful or failed passenger scan
+**When** the operational logs are inspected
+**Then** the entry MUST contain the Session ID, Lane Decision, and Timestamp
+**But** MUST NOT contain the Passenger Name or raw Barcode string (PII)
+**And** the PII fields must be replaced with `[MASKED]` or a non-reversible hash.
+
+### Scenario 7: Hardware Fault Handling
+
+**Given** the physical turnstile is jammed or unresponsive
+**When** the system attempts to open the gate
+**Then** a "Hardware Fault" error is raised via HAL
+**And** the UI shows "Please seek assistance"
+**And** a partial "Health Check" event is sent to the backend.
 
 ---
 
