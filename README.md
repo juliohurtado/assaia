@@ -2,9 +2,11 @@
 
 This repository contains a conceptual and technical design exercise focused on **airport passenger processing**, with special emphasis on **security checkpoint access automation and intelligent queue assignment**.
 
-## 🚀 Executive Summary
+## � System Overview
 
-This design demonstrates a **Robust, Privacy-First, and Resilient** approach to airport automation. It goes beyond happy-path scenarios to address critical operational realities such as network failures, hardware variability, and data privacy regulations (GDPR). The solution is designed to operate continuously even during backend outages, ensuring passenger flow is never disrupted.
+This repository contains the technical design and requirements specification for the **Airport Security Checkpoint Automation System**.
+
+The solution encompasses the end-to-end passenger journey analysis and the detailed software architecture for the automated e-gate workstations. It addresses the functional requirements for passenger processing as well as non-functional requirements regarding system resilience, hardware integration, and data privacy.
 
 ---
 
@@ -26,7 +28,7 @@ Describes the **end-to-end passenger journey** from entering the departure termi
 Defines the requirements for an **automated security checkpoint e-gate workstation**.
 
 - **Core Logic**: Boarding pass validation and intelligent queue assignment.
-- **Enterprise Features**:
+- **Technical Specifications**:
   - **Offline Validation Mode**: Validates IATA BCBP digital signatures locally when the backend is down.
   - **Hardware Abstraction Layer (HAL)**: Supports multiple hardware vendors (gates, scanners) via a unified interface.
   - **Data Privacy**: Enforces PII masking in all logs and events.
@@ -41,7 +43,7 @@ OpenAPI 3.0 specification for the **Airport Security Access & Queue Assignment A
 
 - **Key Capabilities**: Includes sessions, scan validation, decision logic, gate control, and a `/heartbeat` endpoint for hardware health monitoring.
 
-### 4. UML Diagram – Robust Activity Flow
+### 4. UML Diagram – Activity Flow
 
 ![Security Checkpoint e-Gate UML Diagram](./uml.png)
 
@@ -53,21 +55,21 @@ Illustrates the end-to-end flow with a focus on **Request-Response cycles** and 
 
 ---
 
-## 🏗️ Key Architectural Highlights
+## 🏗️ Architectural Design Decisions
 
-This solution implements several "Day 2" operational patterns:
+The system architecture incorporates the following design patterns to meet operational requirements:
 
-1.  **Resilience & Offline First**:
-    The system is designed to fail open or degrade gracefully. Critical validation steps (cryptographic signature checks) can occur locally, ensuring distinct queues (e.g., Round Robin) can still operate without the central brain.
+1.  **Offline Operations Strategy**:
+    To maintain throughput during network outages, the workstation performs local cryptographic validation of IATA BCBP signatures. This allows for basic access control and static queue assignment (e.g., Round Robin) when the central decision engine is unreachable.
 
-2.  **Privacy by Design**:
-    Strict requirements preventing PII leaks. Passenger names are never logged in plain text, decoupling operational metrics from personal identity.
+2.  **Data Privacy Compliance**:
+    Logs and operational events implement automatic masking of Personally Identifiable Information (PII) to comply with data protection regulations. Operational metrics are decoupled from passenger identity.
 
-3.  **Hardware Independence**:
-    A **Hardware Abstraction Layer (HAL)** requirement ensures the business logic is decoupled from specific device drivers (e.g., changing a Gunnebo gate for a Dormakaba one doesn't require code changes).
+3.  **Hardware Abstraction Layer (HAL)**:
+    A dedicated abstraction layer isolates business logic from specific hardware drivers, allowing for the integration of different gate and scanner vendors without modifying the core application code.
 
-4.  **Observability**:
-    Dedicated `Heartbeat` events allow the central monitoring system to detect not just "app online" but also "scanner jammed" or "gate stuck" states.
+4.  **System Observability**:
+    The API includes a `Heartbeat` mechanism to report the real-time status of the workstation and its connected peripherals (scanner, printer, gate mechanisms) to the central monitoring system.
 
 ---
 
