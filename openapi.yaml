@@ -1,0 +1,321 @@
+openapi: 3.0.3
+info:
+  title: Airport Security Access & Queue Assignment API
+  version: 1.0.0
+  description: |
+    Backend API for security checkpoint e-gates. Validates passenger access to the security screening area
+    and assigns an optimal security lane based on passenger context and real-time operational conditions.
+
+servers:
+  - url: https://api.airport.example.com/security/v1
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: Sessions
+    description: Security access session lifecycle
+  - name: Decisions
+    description: Validation and lane assignment decisions
+  - name: GateControl
+    description: Physical gate/turnstile control
+  - name: Events
+    description: Operational events and audit trail
+
+paths:
+  /security-access/sessions:
+    post:
+      tags: [Sessions]
+      summary: Create a security access session at an e-gate
+      operationId: createSecurityAccessSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSessionRequest' }
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { description: Unauthorized }
+        '500': { description: Internal error }
+
+  /security-access/sessions/{sessionId}/scan:
+    post:
+      tags: [Sessions]
+      summary: Submit boarding pass scan data
+      description: |
+        Sends raw scan payload from the barcode reader (QR/Aztec/PDF417/2D).
+        The backend parses and validates the payload format, and links it to the session.
+      operationId: submitBoardingPassScan
+      parameters:
+        - $ref: '#/components/parameters/sessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BoardingPassScanRequest' }
+      responses:
+        '200':
+          description: Scan accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScanResult' }
+        '400': { description: Unreadable/invalid scan payload }
+        '404': { description: Session not found/expired }
+        '500': { description: Internal error }
+
+  /security-access/sessions/{sessionId}/decision:
+    post:
+      tags: [Decisions]
+      summary: Validate access and assign security lane
+      description: |
+        Produces a decision for the passenger:
+        - allow/deny access to security checkpoint
+        - assigned lane (if allowed)
+        - passenger guidance message keys
+      operationId: decideAccessAndLane
+      parameters:
+        - $ref: '#/components/parameters/sessionId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DecisionContextOverride' }
+      responses:
+        '200':
+          description: Decision computed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccessDecision' }
+        '409':
+          description: Cannot decide due to missing scan or lane state unavailable
+        '404':
+          description: Session not found/expired
+        '500':
+          description: Internal error
+
+  /security-access/sessions/{sessionId}/gate/open:
+    post:
+      tags: [GateControl]
+      summary: Open gate for the passenger (only after ALLOW decision)
+      description: |
+        Requests the physical gate/turnstile to open.
+        This endpoint should be called only when AccessDecision.result = ALLOW.
+      operationId: openGate
+      parameters:
+        - $ref: '#/components/parameters/sessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GateOpenRequest' }
+      responses:
+        '204':
+          description: Gate open signal accepted
+        '409':
+          description: Gate cannot be opened (no ALLOW decision, device busy, safety interlock)
+        '404':
+          description: Session not found/expired
+        '500':
+          description: Internal error
+
+  /security-access/events:
+    post:
+      tags: [Events]
+      summary: Emit workstation operational event
+      operationId: emitSecurityAccessEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Event' }
+      responses:
+        '202':
+          description: Event accepted
+        '400':
+          description: Invalid event payload
+        '401':
+          description: Unauthorized
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-EGate-API-Key
+
+  parameters:
+    sessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+    CreateSessionRequest:
+      type: object
+      required: [checkpointId, gateId]
+      properties:
+        checkpointId:
+          type: string
+          example: "SEC-T1-CP-01"
+        gateId:
+          type: string
+          example: "EGATE-03"
+        uiLanguageHint:
+          type: string
+          description: Optional ISO 639-1 hint from kiosk UI (local selection)
+          example: "es"
+
+    Session:
+      type: object
+      required: [sessionId, createdAt, expiresAt]
+      properties:
+        sessionId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        idleTimeoutSeconds: { type: integer, example: 45 }
+
+    BoardingPassScanRequest:
+      type: object
+      required: [scanFormat, payload]
+      properties:
+        scanFormat:
+          type: string
+          enum: [IATA_BCBP_2D, QR, AZTEC, PDF417, UNKNOWN]
+        payload:
+          type: string
+          description: Raw decoded scan payload (string)
+
+    ScanResult:
+      type: object
+      properties:
+        parsed:
+          type: boolean
+        passengerName:
+          type: string
+          example: "GARCIA/MARIA"
+        flightNumber:
+          type: string
+          example: "IB1234"
+        origin:
+          type: string
+          example: "MAD"
+        destination:
+          type: string
+          example: "BCN"
+        departureTime:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items: { type: string }
+
+    DecisionContextOverride:
+      type: object
+      description: |
+        Optional overrides or hints coming from the workstation.
+        Most context should be resolved by the backend via integrations.
+      properties:
+        observedPassengerCategory:
+          type: string
+          description: If the airport has local category indicators at the gate
+          enum: [STANDARD, PRM, SENIOR, MINOR, FAMILY]
+        gateQueuePreference:
+          type: string
+          description: Local preference, if configured (e.g. choose nearer lanes)
+          example: "NEAREST_LANE"
+
+    AccessDecision:
+      type: object
+      required: [result, reasonCode, guidance, laneAssignment]
+      properties:
+        result:
+          type: string
+          enum: [ALLOW, DENY, REFER_TO_STAFF]
+        reasonCode:
+          type: string
+          description: Machine-readable reason
+          example: "OK"
+        laneAssignment:
+          $ref: '#/components/schemas/LaneAssignment'
+        guidance:
+          $ref: '#/components/schemas/PassengerGuidance'
+        audit:
+          $ref: '#/components/schemas/AuditInfo'
+
+    LaneAssignment:
+      type: object
+      properties:
+        laneId:
+          type: string
+          example: "LANE-FAST-2"
+        laneType:
+          type: string
+          enum: [STANDARD, FAST_TRACK, PRM_ASSISTED, FAMILY, OVERFLOW]
+        estimatedWaitMinutes:
+          type: integer
+          example: 6
+        assignmentPolicy:
+          type: string
+          example: "URGENCY_BALANCE_RULESET_V1"
+
+    PassengerGuidance:
+      type: object
+      properties:
+        messageKey: { type: string }
+        messageParams: { type: object, additionalProperties: true }
+        accessibilityText:
+          type: string
+          description: Plain-text instruction not relying on color or icon.
+          example: "Proceed to Fast Lane 2 on the right."
+        visualHint:
+          type: object
+          properties:
+            colorCode: { type: string, example: "GREEN" }
+            icon: { type: string, example: "ARROW_RIGHT" }
+        audibleHint:
+          type: object
+          properties:
+            enabled: { type: boolean, example: true }
+            pattern: { type: string, example: "BEEP_SHORT_X2" }
+
+    GateOpenRequest:
+      type: object
+      required: [gateCommandId]
+      properties:
+        gateCommandId:
+          type: string
+          description: Idempotency token for gate open command
+          example: "CMD-20260118-000123"
+
+    Event:
+      type: object
+      required: [eventType, timestamp, checkpointId, gateId, sessionId]
+      properties:
+        eventType:
+          type: string
+          enum: [SCAN_OK, SCAN_FAILED, DECISION_MADE, GATE_OPENED, GATE_DENIED, STAFF_REFERRAL]
+        timestamp:
+          type: string
+          format: date-time
+        checkpointId:
+          type: string
+        gateId:
+          type: string
+        sessionId:
+          type: string
+          format: uuid
+        details:
+          type: object
+          additionalProperties: true
+
+    AuditInfo:
+      type: object
+      properties:
+        traceId:
+          type: string
+          example: "trc_6f2b9c9c2a9f4b0e"
