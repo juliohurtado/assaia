@@ -10,6 +10,15 @@ The solution encompasses the end-to-end passenger journey analysis and the detai
 
 ---
 
+## 🧭 How to Navigate This Repository
+
+1.  Start with **`airport_flow.md`** to understand the high-level passenger context.
+2.  Review **`checkpoint.md`** for detailed functional and non-functional requirements.
+3.  Check the **Swagger UI** to see the technical contract.
+4.  Examine the **UML Diagram** (`uml.png`) to visualize the decision logic and fallback paths.
+
+---
+
 ## 📁 Repository Contents
 
 ### 1. Passenger Journey – Process Design
@@ -70,15 +79,6 @@ The system architecture incorporates the following design patterns to meet opera
 
 4.  **System Observability**:
     The API includes a `Heartbeat` mechanism to report the real-time status of the workstation and its connected peripherals (scanner, printer, gate mechanisms) to the central monitoring system.
-
----
-
-## 🧭 How to Navigate This Repository
-
-1.  Start with **`airport_flow.md`** to understand the high-level passenger context.
-2.  Review **`checkpoint.md`** for detailed functional and non-functional requirements.
-3.  Check the **Swagger UI** to see the technical contract.
-4.  Examine the **UML Diagram** (`uml.png`) to visualize the decision logic and fallback paths.
 
 ---
 
