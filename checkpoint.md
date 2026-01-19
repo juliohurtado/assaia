@@ -143,6 +143,113 @@ And Error rate is < 0.1%
 
 ---
 
+## Appendix A: Reason Code Catalog
+
+| reasonCode         | Description                                     | HTTP Status          |
+| ------------------ | ----------------------------------------------- | -------------------- |
+| `OK`               | Access granted, lane assigned                   | 200                  |
+| `FLIGHT_EXPIRED`   | Flight date is in the past                      | 200 (DENY)           |
+| `FLIGHT_NOT_TODAY` | Flight is not scheduled for today               | 200 (DENY)           |
+| `AIRPORT_MISMATCH` | Boarding pass airport does not match checkpoint | 200 (DENY)           |
+| `TOO_EARLY`        | Passenger is outside the access time window     | 200 (DENY)           |
+| `FLIGHT_CANCELLED` | Flight status is CANCELLED                      | 200 (DENY)           |
+| `URGENCY_PRIORITY` | Lane upgraded due to imminent departure         | 200                  |
+| `PRM_ASSIGNED`     | PRM passenger routed to assisted lane           | 200                  |
+| `LANE_UNAVAILABLE` | No suitable lane is currently open              | 200 (REFER_TO_STAFF) |
+| `SCAN_PARSE_ERROR` | BCBP payload could not be parsed                | 400                  |
+
+---
+
+## Appendix B: Lane Assignment Algorithm
+
+```
+FUNCTION assignLane(passenger, lanes):
+    # 1. Filter eligible lanes
+    eligibleLanes = lanes.filter(lane => lane.status == OPEN)
+
+    # 2. Mandatory routing rules
+    IF passenger.category == PRM:
+        RETURN eligibleLanes.find(lane => lane.type == PRM_ASSISTED)
+
+    IF passenger.category == FAMILY:
+        RETURN eligibleLanes.find(lane => lane.type == FAMILY)
+
+    # 3. Urgency check (< 45 mins to departure)
+    IF passenger.minutesToDeparture < 45:
+        fastLane = eligibleLanes.find(lane => lane.type == FAST_TRACK)
+        IF fastLane EXISTS:
+            RETURN fastLane
+
+    # 4. Load balancing (select lane with shortest queue)
+    RETURN eligibleLanes.sortBy(lane => lane.currentQueueLength).first()
+```
+
+**Priority Order**: PRM > Family > Urgency > Load Balance
+
+---
+
+## Appendix C: Configuration Parameters
+
+| Parameter                 | Description                                   | Default           | Env Variable                   |
+| ------------------------- | --------------------------------------------- | ----------------- | ------------------------------ |
+| `accessWindowHours`       | Hours before departure when access is allowed | `4`               | `EGATE_ACCESS_WINDOW_HOURS`    |
+| `urgencyThresholdMinutes` | Minutes to departure to trigger priority      | `45`              | `EGATE_URGENCY_THRESHOLD_MINS` |
+| `sessionTimeoutSeconds`   | Idle session expiration                       | `60`              | `EGATE_SESSION_TIMEOUT_SECS`   |
+| `apiKeyHeader`            | Name of API Key header                        | `X-EGate-API-Key` | `EGATE_API_KEY_HEADER`         |
+| `logMaskPii`              | Enable PII masking in logs                    | `true`            | `EGATE_LOG_MASK_PII`           |
+
+---
+
+## Appendix D: Pre-Production Deployment
+
+### Environment: `PRE-PROD`
+
+**API Base URL**: `https://api-preprod.airport.example.com/security/v1`
+
+### Database (PostgreSQL)
+
+```yaml
+host: db-preprod.airport.internal
+port: 5432
+database: security_access_db
+username: egate_app
+password: ${EGATE_DB_PASSWORD} # From Vault/Secrets Manager
+schema: public
+pool_size: 10
+```
+
+### Cache (Redis)
+
+```yaml
+host: redis-preprod.airport.internal
+port: 6379
+database: 0
+password: ${EGATE_REDIS_PASSWORD}
+ttl_flight_status_seconds: 300
+```
+
+### External Integrations (Mocked)
+
+| System             | Pre-Prod Endpoint                            | Mode |
+| ------------------ | -------------------------------------------- | ---- |
+| AODB (Flight Data) | `https://mock-aodb.airport.internal/flights` | Mock |
+| Queue Monitor      | `https://mock-queue.airport.internal/lanes`  | Mock |
+
+### API Keys (Pre-Prod)
+
+| Client                | API Key (Masked)                 |
+| --------------------- | -------------------------------- |
+| Workstation Simulator | `pk_preprod_ws_***************`  |
+| Integration Tests     | `pk_preprod_test_**************` |
+
+### Monitoring
+
+- **Logs**: Splunk → Index `airport-security-preprod`
+- **Metrics**: Prometheus → `https://prometheus-preprod.airport.internal`
+- **Alerts**: PagerDuty → Team `Security-Systems-Preprod`
+
+---
+
 ## Definition of Done
 
 - Functional requirements implemented and tested.
