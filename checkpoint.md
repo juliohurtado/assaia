@@ -2,12 +2,12 @@
 
 ## Develop Security Access & Queue Assignment API (Backend)
 
-**Epic:** Airport Passenger Flow Optimization
-**Type:** Story
-**Priority:** High
-**Reporter:** Systems Analyst (Airport IT Department)
-**Assignee:** Security Systems Development Team
-**Sprint:** Q1 2026
+- **Epic:** Airport Passenger Flow Optimization
+- **Type:** Story
+- **Priority:** High
+- **Reporter:** Systems Analyst (Airport IT Department)
+- **Assignee:** Security Systems Development Team
+- **Sprint:** Q1 2026
 
 ---
 
@@ -33,7 +33,7 @@ The development generally covers the creation of endpoints, validation logic, an
 
 ### In Scope
 
-- **API Implementation**: `/sessions`, `/scan`, `/decision`, `/gate`, `/events`, `/heartbeat`.
+- **API Implementation**: `/security-access/sessions`, `/security-access/sessions/{sessionId}/scan`, `/security-access/sessions/{sessionId}/decision`, `/security-access/sessions/{sessionId}/gate/open`, `/security-access/events`, `/security-access/heartbeat`.
 - **Logic**: Boarding pass validation (format & business rules), Queue assignment algorithm.
 - **Data**: Mock integration with AODB (Flight data) and Queue Monitors for Pre-prod.
 - **Security**: API Key validation and PII masking in logs.
@@ -52,7 +52,7 @@ The development generally covers the creation of endpoints, validation logic, an
 ### 1. Session & Scan Management
 
 - **POST /security-access/sessions**: Create a unique session for a passenger transaction.
-- **POST /scan**: Submit BCBP payload to the active session.
+- **POST /security-access/sessions/{sessionId}/scan**: Submit BCBP payload to the active session.
 - **Validation Rules**:
   - Flight must be today.
   - Airport code must match.
@@ -60,7 +60,7 @@ The development generally covers the creation of endpoints, validation logic, an
 
 ### 2. Decision Engine
 
-- **POST /decision**:
+- **POST /security-access/sessions/{sessionId}/decision**:
   - Retrieve flight status (Mock/Adapter).
   - Retrieve queue load (Mock/Adapter).
   - Apply assignment rules (Priority, PRM, Load Balancing).
@@ -68,8 +68,8 @@ The development generally covers the creation of endpoints, validation logic, an
 
 ### 3. Gate Control & Eventing
 
-- **POST /gate/open**: Signal acceptance and trigger audit log.
-- **POST /events**: Store operational events for dashboarding.
+- **POST /security-access/sessions/{sessionId}/gate/open**: Signal acceptance and trigger audit log.
+- **POST /security-access/events**: Store operational events for dashboarding.
 
 ---
 
@@ -77,53 +77,69 @@ The development generally covers the creation of endpoints, validation logic, an
 
 ### AC1: Standard Access Flow (Happy Path)
 
-- **Given** a valid API Key
-- **And** a `POST /scan` request with a valid BCBP payload for a future flight
-- **When** `POST /decision` is called
-- **Then** return status `200 OK`
-- **And** response body contains `result: ALLOW` and `laneAssignment: STANDARD`
-- **And** response time is < 200ms.
+### AC1: Standard Access Flow (Happy Path)
+
+```gherkin
+Given a valid API Key
+And a POST /scan request with a valid BCBP payload for a future flight
+When POST /decision is called
+Then return status 200 OK
+And response body contains result: ALLOW and laneAssignment: STANDARD
+And response time is < 200ms
+```
 
 ### AC2: Priority Logic Verification
 
-- **Given** a flight departing in < 45 mins (Mocked AODB response)
-- **When** `POST /decision` is requested
-- **Then** return `laneAssignment: FAST_TRACK`
-- **And** `reasonCode: URGENCY_PRIORITY`.
+```gherkin
+Given a flight departing in < 45 mins (Mocked AODB response)
+When POST /decision is requested
+Then return laneAssignment: FAST_TRACK
+And reasonCode: URGENCY_PRIORITY
+```
 
 ### AC3: Access Denied (Validation Rules)
 
-- **Given** a BCBP payload for a flight yesterday
-- **When** `/scan` is submitted
-- **Then** return `200 OK` (Scan accepted)
-- **But** subsequent `POST /decision` returns `result: DENY`
-- **And** `reasonCode: FLIGHT_EXPIRED`.
+```gherkin
+Given a BCBP payload for a flight yesterday
+When /scan is submitted
+Then return 200 OK (Scan accepted)
+But subsequent POST /decision returns result: DENY
+And reasonCode: FLIGHT_EXPIRED
+```
 
 ### AC4: Security & Authentication
 
-- **Given** a request WITHOUT `X-EGate-API-Key` header
-- **When** any endpoint is called
-- **Then** return `401 Unauthorized`.
+```gherkin
+Given a request WITHOUT X-EGate-API-Key header
+When any endpoint is called
+Then return 401 Unauthorized
+```
 
 ### AC5: API Idempotency & Stability
 
-- **Given** a `POST /gate/open` request is sent twice with the same `gateCommandId`
-- **Then** the second request returns `204 No Content` (Success)
-- **And** ONLY ONE audit event is created in the database.
+```gherkin
+Given a POST /gate/open request is sent twice with the same gateCommandId
+Then the second request returns 204 No Content (Success)
+And ONLY ONE audit event is created in the database
+```
 
 ### AC6: Privacy Compliance (Logs)
 
-- **Given** a passenger "John Doe" has processed successfully
-- **When** searching the Application Logs
-- **Then** the string "John Doe" MUST NOT be found
-- **And** the log entry must contain a masked identifier (e.g. `J*** D**`).
+```gherkin
+Given a passenger "John Doe" has processed successfully
+When searching the Application Logs
+Then the string "John Doe" MUST NOT be found
+And the log entry must contain a masked identifier (e.g. J*** D**)
+```
 
 ### AC7: Load Capability
 
-- **Given** a load of 50 requests/second
-- **When** running the decision engine
-- **Then** P95 Latency remains under 500ms
-- **And** Error rate is < 0.1%.
+```gherkin
+Given a load of 50 requests/second
+When running the decision engine
+Then P95 Latency remains under 500ms
+And Error rate is < 0.1%
+```
 
 ---
 
