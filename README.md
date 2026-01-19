@@ -30,18 +30,15 @@ Describes the **end-to-end passenger journey** from entering the departure termi
 - **Scope**: Terminal Entry → Boarding.
 - **Focus**: Inputs, outputs, participants, and system integrations at each step.
 
-### 2. Security Checkpoint e-Gate – Requirements
+### 2. Security Access API – Development Ticket
 
-📄 **[`checkpoint.md`](./checkpoint.md)**
+**[`checkpoint.md`](./checkpoint.md)**
 
-Defines the requirements for an **automated security checkpoint e-gate workstation**.
+Defines the development task for the **Backend API** that powers the security checkpoint.
 
-- **Core Logic**: Boarding pass validation and intelligent queue assignment.
-- **Technical Specifications**:
-  - **Offline Validation Mode**: Validates IATA BCBP digital signatures locally when the backend is down.
-  - **Hardware Abstraction Layer (HAL)**: Supports multiple hardware vendors (gates, scanners) via a unified interface.
-  - **Data Privacy**: Enforces PII masking in all logs and events.
-  - **Hot-Reloadable Config**: Allows rule changes without downtime.
+- **Focus**: REST API implementation (`/scan`, `/decision`).
+- **Scope**: Backend logic, Pre-Production testing and Integration.
+- **Exclusions**: Hardware drivers and Physical UI (handled in separate tickets).
 
 ### 3. Backend API Specification
 
