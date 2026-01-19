@@ -8,69 +8,93 @@ skinparam activity {
 }
 skinparam activityFontSize 13
 
-title Security Checkpoint e-Gate + Smart Queue Assignment
+title Security Access & Queue Assignment API - Backend Flow
 
 start
 
-partition "Passenger" {
-  :Approach security checkpoint e-gate;
-  :Scan boarding pass (QR/Aztec/2D);
+partition "API Gateway" {
+  :Receive HTTP Request;
+
+  if (Valid API Key?) then (yes)
+    :Route to endpoint;
+  else (no)
+    #LightCoral:Return 401 Unauthorized;
+    stop
+  endif
 }
 
-partition "e-Gate Workstation\n(UI + Devices)" {
-  :Read barcode payload;
-  :Show "Processing...";
+partition "POST /security-access/sessions" {
+  :Create Session (UUID);
+  :Store in Database;
+  :Return Session + Expiry;
+}
 
-  if (Backend Online?) then (yes)
-    partition "API Interaction" {
-        :POST /sessions/{id}/scan;
+partition "POST .../sessions/{id}/scan" {
+  :Validate Session exists;
+  :Parse BCBP Payload;
 
-        if (Scan Accepted?) then (yes)
-            :POST /sessions/{id}/decision;
-
-            partition "Airport Security Access API" {
-                :Validate Session;
-                group "Context Enrichment (Synchronous)"
-                    :Fetch Flight Status (AODB);
-                    :Fetch Lane Status (Queue Monitor);
-                end group
-                :Execute Assignment Rules;
-                :Return AccessDecision\n(ALLOW/DENY);
-            }
-        else (no)
-            :Display "Invalid Barcode";
-            stop
-        endif
-    }
-  else (no - Offline Mode)
-    partition "Local Logic (Resilience)" {
-        :Validate BCBP Signature (Local Keys);
-        :Apply Static Assignment Rules\n(e.g. Round Robin);
-    }
+  if (Parse OK?) then (yes)
+    :Extract Flight Info;
+    :Link to Session;
+    :Return ScanResult;
+  else (no)
+    #LightCoral:Return 400 Bad Request;
+    stop
   endif
+}
 
-  if (Decision == ALLOW?) then (yes)
-    :Display Assigned Lane;
+partition "POST .../sessions/{id}/decision" {
+  :Validate Session + Scan exists;
 
-    if (Online?) then (yes)
-        :POST /gate/open;
+  group "Context Enrichment"
+    :Fetch Flight Status (AODB Adapter);
+    :Fetch Lane Status (Queue Adapter);
+  end group
+
+  group "Business Rules"
+    if (Flight Valid Today?) then (yes)
+      if (Within Access Window?) then (yes)
+        :Continue;
+      else (no)
+        :reasonCode = TOO_EARLY;
+        :result = DENY;
+        stop
+      endif
+    else (no)
+      :reasonCode = FLIGHT_EXPIRED;
+      :result = DENY;
+      stop
     endif
+  end group
 
-    partition "Gate Hardware (HAL)" {
-        :Unlock Turnstile;
-    }
+  group "Lane Assignment Algorithm"
+    if (Passenger = PRM?) then (yes)
+      :Assign PRM_ASSISTED lane;
+    else if (Minutes to Departure < 45?) then (yes)
+      :Assign FAST_TRACK lane;
+    else (default)
+      :Assign STANDARD (Load Balanced);
+    endif
+  end group
 
-    :Show "Proceed to Lane X";
+  :Return AccessDecision;
+  note right
+    result: ALLOW
+    laneAssignment: {...}
+    reasonCode: OK
+  end note
+}
 
-    partition "Passenger" {
-        :Walk through gate;
-    }
-  else (no / REFER)
-    #LightCoral:Display "Access Denied" or "Contact Staff";
-    partition "Passenger" {
-        :Go to assistance desk;
-    }
-  endif
+partition "POST .../sessions/{id}/gate/open" {
+  :Validate gateCommandId (Idempotency);
+  :Log Audit Event;
+  :Return 204 No Content;
+}
+
+partition "POST /security-access/events" {
+  :Validate Event Payload;
+  :Store in Event Log;
+  :Return 202 Accepted;
 }
 
 stop
